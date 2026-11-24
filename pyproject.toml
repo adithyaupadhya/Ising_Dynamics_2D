@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ising-dynamics"
+version = "0"
+description = "Fixed-boundary Ising dynamics with a competing field"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "scipy>=1.10", "matplotlib>=3.7", "Pillow>=9.5", "numba>=0.59"]
+
+[project.scripts]
+ising = "ising.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["ising*"]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.9"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

@@ -1,0 +1,9 @@
+N,dynamics,python_ms,numba_ms,speedup
+32,heatbath,1.27150,0.03975,31.99
+32,metropolis,1.31641,0.04538,29.01
+64,heatbath,4.82762,0.11795,40.93
+64,metropolis,4.78948,0.10973,43.65
+128,heatbath,18.41081,0.46571,39.53
+128,metropolis,18.89648,0.42476,44.49
+256,heatbath,72.41165,1.84637,39.22
+256,metropolis,76.56424,1.79085,42.75

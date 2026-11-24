@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ising Dynamics</title>
+<style>
+/* Layout: a square spin lattice on the left, controls on the right, two time-series plots below. */
+:root {
+  --bg: #eef1f4;
+  --surface: #f9fafb;
+  --fg: #16202b;
+  --muted: #55626f;
+  --line: #d0d8df;
+  --accent: #a8500f;
+  --accent-ink: #ffffff;
+  --minus: #2c4a6b;
+  --plus: #e3952f;
+  --wall: #14263a;
+  --good: #1f7a4d;
+  --font-display: system-ui, sans-serif;
+  --font-body: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1319;
+    --surface: #171d25;
+    --fg: #e6ebf0;
+    --muted: #93a1b0;
+    --line: #2a333e;
+    --accent: #f0a847;
+    --accent-ink: #14100a;
+    --minus: #29507c;
+    --plus: #f0a847;
+    --wall: #16293f;
+    --good: #5fc690;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1319;
+  --surface: #171d25;
+  --fg: #e6ebf0;
+  --muted: #93a1b0;
+  --line: #2a333e;
+  --accent: #f0a847;
+  --accent-ink: #14100a;
+  --minus: #29507c;
+  --plus: #f0a847;
+  --wall: #16293f;
+  --good: #5fc690;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0;
+  padding-block: 22px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(25px, 4vw, 32px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin: 0 0 5px;
+  text-wrap: balance;
+}
+.lede { max-width: 66ch; color: var(--muted); margin: 0; }
+.lede b { color: var(--fg); font-weight: 500; }
+.lab { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+.stage, .panel, .plots {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  min-width: 0;
+}
+.stage { padding: 16px; display: flex; flex-direction: column; gap: 12px; justify-content: space-between; }
+.grid-wrap { flex: 0 0 auto; width: 100%; aspect-ratio: 1; max-width: 100%; background: var(--wall); border-radius: 4px; overflow: hidden; }
+#grid { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+.readout { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.readout div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.readout dt {
+  font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+}
+.readout dd { margin: 0; font-family: var(--font-data); font-size: 15px; font-variant-numeric: tabular-nums; }
+dl.readout { margin: 0; }
+.panel { padding: 16px; display: flex; flex-direction: column; gap: 14px; justify-content: space-evenly; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 28px; flex-wrap: wrap; }
+.field-head > label, .field-head > .control-heading { font-weight: 500; font-size: 13px; line-height: 1.4; color: var(--fg); }
+.val { font-family: var(--font-data); font-size: 13px; font-variant-numeric: tabular-nums; color: var(--muted); }
+input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+select {
+  font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 8px; width: 100%;
+}
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg input { position: absolute; opacity: 0; pointer-events: none; }
+.seg label {
+  text-align: center; padding: 7px 4px; font-size: 12.5px; cursor: pointer; background: var(--bg);
+  border-left: 1px solid var(--line);
+}
+.seg label:first-of-type { border-left: 0; }
+.seg input:checked + label { background: var(--accent); color: var(--accent-ink); font-weight: 500; }
+.seg input:focus-visible + label { outline: 2px solid var(--fg); outline-offset: -2px; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+button {
+  font: inherit; font-size: 13px; color: var(--fg); background: var(--bg); cursor: pointer;
+  border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px;
+}
+button:hover { border-color: var(--muted); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 500; min-width: 84px; }
+.plots { padding: 12px 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.plot-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.plot-title b { font-size: 13px; font-weight: 500; }
+canvas.plot { display: block; width: 100%; height: 150px; }
+.notes { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.number { width: 82px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 5px; background: var(--bg); color: var(--fg); font: 13px var(--font-data); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; }
+.plus-key { background: var(--plus); } .minus-key { background: var(--minus); } .wall-key { background: var(--wall); }
+code { font-family: var(--font-data); font-size: 0.9em; }
+@media (max-width: 900px) {
+  .lab, .plots { grid-template-columns: minmax(0, 1fr); }
+  .panel { justify-content: flex-start; }
+  .readout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Ising dynamics</h1>
+    <p class="lede">Fixed minus boundary · Bulk field <b>h = λ/N</b></p>
+  </header>
+
+  <div class="lab">
+    <section class="stage" aria-label="Spin lattice">
+      <div class="grid-wrap"><canvas id="grid" role="img" aria-label="Spin configuration, amber is plus and blue is minus"></canvas></div>
+      <div class="legend"><span><i class="plus-key"></i> +1</span><span><i class="minus-key"></i> −1</span><span><i class="wall-key"></i> Fixed boundary</span></div>
+      <dl class="readout">
+        <div><dt>Sweeps</dt><dd id="rT">0</dd></div>
+        <div><dt>Magnetization</dt><dd id="rM">−1.000</dd></div>
+        <div><dt>Largest + cluster</dt><dd id="rA">0.000</dd></div>
+        <div><dt>Field h = λ/N</dt><dd id="rH">0.047</dd></div>
+      </dl>
+    </section>
+
+    <section class="panel" aria-label="Controls">
+      <div class="field">
+        <div class="field-head"><span class="control-heading">Dynamics</span></div>
+        <div class="seg" role="radiogroup" aria-label="Dynamics">
+          <input type="radio" name="dyn" id="dynHB" value="heatbath" checked><label for="dynHB">Heat bath</label>
+          <input type="radio" name="dyn" id="dynMP" value="metropolis"><label for="dynMP">Metropolis</label>
+          <input type="radio" name="dyn" id="dynSW" value="sw"><label for="dynSW">Swendsen–Wang</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="field-head"><label for="lam">Field strength λ</label><input class="number" type="number" id="lamV" aria-label="Exact lam value" min="0" max="30" step="0.05" value="3"></div>
+        <input type="range" id="lam" min="0" max="30" step="0.05" value="3">
+      </div>
+
+      <div class="field">
+        <div class="field-head"><label for="beta">Inverse temperature β</label><input class="number" type="number" id="betaV" aria-label="Exact beta value" min="0.05" max="3" step="0.005" value="0.5"></div>
+        <input type="range" id="beta" min="0.05" max="3" step="0.005" value="0.5">
+        <span class="val">β<sub>c</sub> = 0.4407 · T = <span id="tV">2.00</span> · m* = <span id="msV">0.000</span></span>
+      </div>
+
+      <div class="field">
+        <div class="field-head"><label for="spf">Sweeps per frame (max)</label><input class="number" type="number" id="spfV" aria-label="Exact spf value" min="1" max="300" step="1" value="10"></div>
+        <input type="range" id="spf" min="1" max="300" step="1" value="10">
+      </div>
+
+      <div class="field">
+        <div class="field-head"><label for="size">Box size N</label></div>
+        <select id="size">
+          <option value="8">8 × 8</option>
+          <option value="16">16 × 16</option>
+          <option value="24">24 × 24</option>
+          <option value="32">32 × 32</option>
+          <option value="48">48 × 48</option>
+          <option value="64" selected>64 × 64</option>
+          <option value="96">96 × 96</option>
+          <option value="128">128 × 128</option>
+          <option value="192">192 × 192</option>
+          <option value="256">256 × 256</option>
+          <option value="384">384 × 384</option>
+          <option value="512">512 × 512</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <div class="field-head"><span class="control-heading">Restart from</span></div>
+        <div class="btns">
+          <button type="button" data-init="minus">All −</button>
+          <button type="button" data-init="plus">All +</button>
+          <button type="button" data-init="random">Random</button>
+        </div>
+      </div>
+      <div class="btns">
+        <button type="button" class="primary" id="run">Pause</button>
+        <button type="button" id="step">Step 1 sweep</button>
+      </div>
+
+      <p class="notes">Per sweep, heat bath/Metropolis makes N² sequential random site updates while Swendsen–Wang uses one cluster update.</p>
+
+    </section>
+  </div>
+
+  <section class="plots" aria-label="Time series">
+    <div>
+      <div class="plot-title"><b>Magnetization m(t)</b><span class="val">Dashed: ±m* (zero field)</span></div>
+      <canvas class="plot" id="plotM"></canvas>
+    </div>
+    <div>
+      <div class="plot-title"><b>Largest + cluster fraction</b></div>
+      <canvas class="plot" id="plotA"></canvas>
+    </div>
+  </section>
+
+  
+</div>
+
+<script>
+(function () {
+  var BETA_C = 0.5 * Math.log(1 + Math.SQRT2);
+  var S = { N: 64, beta: 0.5, lam: 3, dyn: "heatbath", spf: 10, running: true, t: 0 };
+  var spin, vis, stack, W, parent, lab;
+  var pPlus = new Float64Array(5), acc = new Float64Array(10);
+  var rng = (Math.random() * 4294967295) >>> 0 || 123456789;
+  var hist = { t: [], m: [], a: [] }, every = 1, frameNo = 0, lastA = 0;
+  var colors = { minus: [44, 74, 107], plus: [227, 149, 47], wall: [20, 38, 58], text: "#000", muted: "#666", line: "#ccc", accent: "#a60" };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var grid = $("grid"), gctx = grid.getContext("2d"), img = null;
+
+  function rand() {
+    rng ^= rng << 13; rng >>>= 0;
+    rng ^= rng >>> 17;
+    rng ^= rng << 5; rng >>>= 0;
+    return rng / 4294967296;
+  }
+
+  function mStar(b) { return b > BETA_C ? Math.pow(1 - Math.pow(Math.sinh(2 * b), -4), 0.125) : 0; }
+
+  function buildTables() {
+    var h = S.lam / S.N, b = S.beta;
+    for (var k = 0; k < 5; k++) {
+      var nb = 2 * k - 4;
+      pPlus[k] = 1 / (1 + Math.exp(-2 * b * (nb + h)));
+      var dUp = 2 * (nb + h);        // flipping a +1 spin
+      var dDn = -2 * (nb + h);       // flipping a -1 spin
+      acc[5 + k] = dUp <= 0 ? 1 : Math.exp(-b * dUp);
+      acc[k] = dDn <= 0 ? 1 : Math.exp(-b * dDn);
+    }
+  }
+
+  function reset(init) {
+    var N = S.N; W = N + 2;
+    spin = new Int8Array(W * W).fill(-1);
+    vis = new Uint8Array(W * W);
+    stack = new Int32Array(N * N);
+    parent = new Int32Array(N * N + 2);
+    lab = new Int8Array(N * N + 2);
+    for (var i = 1; i <= N; i++) for (var j = 1; j <= N; j++) {
+      var p = i * W + j;
+      spin[p] = init === "plus" ? 1 : init === "random" ? (rand() < 0.5 ? 1 : -1) : -1;
+    }
+    S.t = 0; hist = { t: [], m: [], a: [] }; every = 1; frameNo = 0;
+    grid.width = W; grid.height = W; img = gctx.createImageData(W, W);
+    buildTables();
+    record();
+  }
+
+  function find(x) {
+    while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; }
+    return x;
+  }
+
+  function join(a, b) {
+    a = find(a); b = find(b);
+    if (a !== b) parent[a] = b;
+  }
+
+  // One Swendsen-Wang step. Node N*N is the fixed - frame and node N*N+1 is a ghost + spin that carries the field:
+  // equal neighbors join with prob 1 - e^(-2 beta), a + spin joins the ghost with prob 1 - e^(-2 beta lam / N),
+  // a - spin next to the frame joins it with prob 1 - e^(-2 beta). Frame cluster -> -, ghost cluster -> +, others fair coin.
+  function swStep() {
+    var N = S.N, n = N * N, MINUS = n, PLUS = n + 1;
+    var p = 1 - Math.exp(-2 * S.beta), pg = 1 - Math.exp(-2 * S.beta * S.lam / N);
+    var i, j, id, s, r;
+    for (i = 0; i < n + 2; i++) parent[i] = i;
+    for (i = 1; i <= N; i++) {
+      for (j = 1; j <= N; j++) {
+        id = (i - 1) * N + (j - 1);
+        s = spin[i * W + j];
+        if (s === 1) {
+          if (rand() < pg) join(id, PLUS);
+          if (j < N && spin[i * W + j + 1] === 1 && rand() < p) join(id, id + 1);
+          if (i < N && spin[(i + 1) * W + j] === 1 && rand() < p) join(id, id + N);
+        } else {
+          if (j === 1 && rand() < p) join(id, MINUS);
+          if (j === N && rand() < p) join(id, MINUS);
+          if (i === 1 && rand() < p) join(id, MINUS);
+          if (i === N && rand() < p) join(id, MINUS);
+          if (j < N && spin[i * W + j + 1] === -1 && rand() < p) join(id, id + 1);
+          if (i < N && spin[(i + 1) * W + j] === -1 && rand() < p) join(id, id + N);
+        }
+      }
+    }
+    lab.fill(0);
+    lab[find(MINUS)] = -1;
+    lab[find(PLUS)] = 1;
+    for (i = 1; i <= N; i++) {
+      for (j = 1; j <= N; j++) {
+        r = find((i - 1) * N + (j - 1));
+        if (lab[r] === 0) lab[r] = rand() < 0.5 ? 1 : -1;
+        spin[i * W + j] = lab[r];
+      }
+    }
+  }
+
+  function sweep() {
+    if (S.dyn === "sw") { swStep(); return; }
+    var N = S.N, hb = S.dyn === "heatbath";
+    // Rejection avoids modulo bias in the nonzero xorshift32 state space.
+    var area = N*N, bound = Math.floor(4294967295/area)*area;
+    for (var q = 0; q < area; q++) {
+      var id;
+      do { id = rand()*4294967296 - 1; } while (id >= bound);
+      id %= area;
+      var p = (Math.floor(id/N)+1)*W + id%N + 1;
+      var k = (spin[p-1]+spin[p+1]+spin[p-W]+spin[p+W]+4)>>1;
+      if (hb) spin[p] = rand() < pPlus[k] ? 1 : -1;
+      else if (rand() < acc[(((spin[p]+1)>>1)*5)+k]) spin[p] = -spin[p];
+    }
+  }
+
+
+  function magnetization() {
+    var N = S.N, sum = 0;
+    for (var i = 1; i <= N; i++) { var row = i * W; for (var j = 1; j <= N; j++) sum += spin[row + j]; }
+    return sum / (N * N);
+  }
+
+  function largestPlus() {
+    var N = S.N, best = 0;
+    vis.fill(0);
+    for (var i = 1; i <= N; i++) for (var j = 1; j <= N; j++) {
+      var p0 = i * W + j;
+      if (spin[p0] === 1 && !vis[p0]) {
+        var sp = 0, size = 0;
+        stack[sp++] = p0; vis[p0] = 1;
+        while (sp) {
+          var q = stack[--sp]; size++;
+          var n;
+          n = q - 1; if (spin[n] === 1 && !vis[n]) { vis[n] = 1; stack[sp++] = n; }
+          n = q + 1; if (spin[n] === 1 && !vis[n]) { vis[n] = 1; stack[sp++] = n; }
+          n = q - W; if (spin[n] === 1 && !vis[n]) { vis[n] = 1; stack[sp++] = n; }
+          n = q + W; if (spin[n] === 1 && !vis[n]) { vis[n] = 1; stack[sp++] = n; }
+        }
+        if (size > best) best = size;
+      }
+    }
+    return best / (N * N);
+  }
+
+  var lastM = -1;
+  function record() {
+    lastM = magnetization();
+    lastA = largestPlus();
+    frameNo++;
+    if (frameNo % every !== 0 && hist.t.length > 0) return;
+    hist.t.push(S.t); hist.m.push(lastM); hist.a.push(lastA);
+    if (hist.t.length > 1600) {
+      for (var key in hist) hist[key] = hist[key].filter(function (_, idx) { return idx % 2 === 0; });
+      every *= 2;
+    }
+  }
+
+  function readColors() {
+    var cs = getComputedStyle(document.documentElement);
+    function hex(name) {
+      var v = cs.getPropertyValue(name).trim().replace("#", "");
+      return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)];
+    }
+    colors.minus = hex("--minus"); colors.plus = hex("--plus"); colors.wall = hex("--wall");
+    colors.text = cs.getPropertyValue("--fg").trim();
+    colors.muted = cs.getPropertyValue("--muted").trim();
+    colors.line = cs.getPropertyValue("--line").trim();
+    colors.accent = cs.getPropertyValue("--accent").trim();
+  }
+
+  function render() {
+    var d = img.data, N = S.N, pl = colors.plus, mi = colors.minus, wa = colors.wall;
+    for (var i = 0; i < W; i++) for (var j = 0; j < W; j++) {
+      var p = i * W + j, o = p * 4, c;
+      if (i === 0 || j === 0 || i === W - 1 || j === W - 1) c = wa;
+      else c = spin[p] === 1 ? pl : mi;
+      d[o] = c[0]; d[o + 1] = c[1]; d[o + 2] = c[2]; d[o + 3] = 255;
+    }
+    gctx.putImageData(img, 0, 0);
+  }
+
+  function niceStep(range, maxTicks) {
+    var scale = Math.pow(10, Math.floor(Math.log10(range / maxTicks)));
+    var steps = [scale, 2*scale, 5*scale, 10*scale];
+    for (var i = 0; i < steps.length; i++) if (range / steps[i] <= maxTicks) return steps[i];
+    return steps[steps.length - 1];
+  }
+
+  function drawPlot(cv, ys, ymin, ymax, yTicks, refs, color) {
+    var dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+    if (!w) return;
+    if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+    var c = cv.getContext("2d");
+    c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, w, h);
+    var L = 40, R = 12, T = 8, B = 22, pw = w - L - R, ph = h - T - B;
+    var tmax = Math.max(S.t, 100);
+    function X(t) { return L + pw * t / tmax; }
+    function Y(v) { return T + ph * (1 - (v - ymin) / (ymax - ymin)); }
+    c.font = "11px " + getComputedStyle(document.body).getPropertyValue("--font-data");
+    c.lineWidth = 1; c.strokeStyle = colors.line; c.fillStyle = colors.muted;
+    c.textAlign = "right"; c.textBaseline = "middle";
+    yTicks.forEach(function (v) {
+      c.beginPath(); c.moveTo(L, Math.round(Y(v)) + 0.5); c.lineTo(L + pw, Math.round(Y(v)) + 0.5); c.stroke();
+      c.fillText(String(v), L - 6, Y(v));
+    });
+    var step = niceStep(tmax, 6);
+    c.textAlign = "center"; c.textBaseline = "top";
+    for (var t = 0; t <= tmax; t += step) { c.fillText(String(t), X(t), T + ph + 5); }
+    c.setLineDash([4, 4]); c.strokeStyle = colors.muted;
+    refs.forEach(function (r) {
+      c.beginPath(); c.moveTo(L, Y(r.v)); c.lineTo(L + pw, Y(r.v)); c.stroke();
+    });
+    c.setLineDash([]);
+    c.strokeStyle = color; c.lineWidth = 1.75; c.lineJoin = "round";
+    c.beginPath();
+    for (var k = 0; k < hist.t.length; k++) {
+      var px = X(hist.t[k]), py = Y(ys[k]);
+      if (k === 0) c.moveTo(px, py); else c.lineTo(px, py);
+    }
+    c.stroke();
+    if (hist.t.length) {
+      var lx = X(hist.t[hist.t.length - 1]), ly = Y(ys[hist.t.length - 1]);
+      c.fillStyle = color; c.beginPath(); c.arc(lx, ly, 3.5, 0, 6.2832); c.fill();
+    }
+  }
+
+  function drawPlots() {
+    var ms = mStar(S.beta);
+    var refs = ms > 0 ? [{ v: ms }, { v: -ms }] : [];
+    drawPlot($("plotM"), hist.m, -1, 1, [-1, -0.5, 0, 0.5, 1], refs, colors.accent);
+    drawPlot($("plotA"), hist.a, 0, 1, [0, 0.25, 0.5, 0.75, 1], [], colors.accent);
+  }
+
+  function fmtM(m) { return (m >= 0 ? "+" : "−") + Math.abs(m).toFixed(3); }
+
+  function updateReadouts() {
+    $("rT").textContent = S.t;
+    $("rM").textContent = fmtM(lastM);
+    $("rA").textContent = lastA.toFixed(3);
+    $("rH").textContent = (S.lam / S.N).toFixed(4);
+  }
+
+  function syncLabels() {
+    $("lamV").value = S.lam.toFixed(2);
+    $("betaV").value = S.beta.toFixed(3);
+    $("tV").textContent = (1 / S.beta).toFixed(2);
+    $("msV").textContent = mStar(S.beta).toFixed(3);
+    $("spfV").value = S.spf;
+  }
+
+  function frame() {
+    if (S.running) {
+      // Yield between sweeps to keep controls responsive at large N.
+      var start = performance.now(), k = 0;
+      do { sweep(); k++; } while (k < S.spf && performance.now() - start < 18);
+      S.t += k;
+      record();
+    }
+    
+    render(); updateReadouts(); drawPlots();
+    requestAnimationFrame(frame);
+  }
+
+  $("lam").addEventListener("input", function (e) { S.lam = +e.target.value; syncLabels(); buildTables(); });
+  $("beta").addEventListener("input", function (e) { S.beta = +e.target.value; syncLabels(); buildTables(); });
+  $("spf").addEventListener("input", function (e) { S.spf = +e.target.value; syncLabels(); });
+  ["lam", "beta", "spf"].forEach(function (id) {
+    $(id + "V").addEventListener("change", function () {
+      var slider = $(id), v = Number(this.value);
+      if (this.value.trim() !== "" && Number.isFinite(v)) slider.value = v;
+      slider.dispatchEvent(new Event("input"));
+    });
+  });
+  $("size").addEventListener("change", function (e) { S.N = +e.target.value; reset("minus"); });
+  document.querySelectorAll("input[name=dyn]").forEach(function (r) {
+    r.addEventListener("change", function () { S.dyn = r.value; });
+  });
+  document.querySelectorAll("[data-init]").forEach(function (b) {
+    b.addEventListener("click", function () { reset(b.dataset.init); });
+  });
+  $("run").addEventListener("click", function () {
+    S.running = !S.running; $("run").textContent = S.running ? "Pause" : "Resume";
+  });
+  $("step").addEventListener("click", function () {
+    S.running = false; $("run").textContent = "Resume";
+    sweep(); S.t += 1; record();
+  });
+
+  window.addEventListener("resize", drawPlots);
+  if (window.matchMedia) {
+    var mq = window.matchMedia("(prefers-color-scheme: dark)");
+    (mq.addEventListener ? mq.addEventListener.bind(mq, "change") : mq.addListener.bind(mq))(readColors);
+  }
+  new MutationObserver(readColors).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  readColors(); syncLabels(); reset("minus");
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body></html>
