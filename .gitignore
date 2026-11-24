@@ -10,3 +10,5 @@ dist/
 
 .ruff_cache/
 *.egg
+
+.ipynb_checkpoints/

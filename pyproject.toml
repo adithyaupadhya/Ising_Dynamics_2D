@@ -19,6 +19,7 @@ include = ["ising*"]
 
 [project.optional-dependencies]
 dev = ["ruff>=0.9"]
+notebook = ["jupyterlab>=4", "ipywidgets>=8", "nbclient>=0.10", "nbformat>=5"]
 
 [tool.ruff]
 line-length = 100

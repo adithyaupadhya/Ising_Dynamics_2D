@@ -32,6 +32,17 @@ python -m pip install -e .
 
 Installation resolves the dependencies declared in `pyproject.toml`. In VS Code, select the virtual environment as your Python interpreter.
 
+## Jupyter notebooks
+
+From the repository root in your activated environment:
+
+```bash
+python -m pip install -e ".[notebook]"
+python -m jupyterlab
+```
+
+Start with [Introduction](notebooks/01_introduction.ipynb). Select your installed environment as the kernel. See [notebook guide](notebooks/README.md) for details.
+
 ## Quick start
 
 ```bash
