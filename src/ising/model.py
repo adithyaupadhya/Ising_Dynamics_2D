@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 import numpy as np
 
-BETA_C = 0.5 * np.log(1 + np.sqrt(2))
+from .geometry.square import SquareLattice, BETA_C as BETA_C
 
 @dataclass(frozen=True)
 class IsingModel:
@@ -15,6 +15,18 @@ class IsingModel:
             raise ValueError('N must be a positive integer')
         if not np.isfinite(self.beta) or self.beta <= 0 or not np.isfinite(self.lam) or self.lam < 0:
             raise ValueError('Require finite beta > 0 and lambda >= 0')
+    @property
+    def geometry(self) -> SquareLattice:
+        return SquareLattice(self.N)
+
+    @property
+    def num_sites(self) -> int:
+        return self.geometry.num_sites
+
+    @property
+    def num_bonds(self) -> int:
+        return self.geometry.num_bonds
+
     @property
     def h(self) -> float:
         return self.lam / self.N

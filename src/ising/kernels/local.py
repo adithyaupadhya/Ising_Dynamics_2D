@@ -5,7 +5,8 @@ from numba import njit
 
 def local_tables(model):
     """Build heat-bath and Metropolis lookup tables."""
-    local_fields = 2 * np.arange(5) - 4 + model.h
+    degree = model.geometry.degree
+    local_fields = 2 * np.arange(degree + 1) - degree + model.h
     heatbath_probs = np.exp(-np.logaddexp(0., -2 * model.beta * local_fields))
     metropolis_probs = np.exp(-model.beta * np.maximum(2 * np.array([-1, 1])[:, None] * local_fields, 0))
     return heatbath_probs, metropolis_probs

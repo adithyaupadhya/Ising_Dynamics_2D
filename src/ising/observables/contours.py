@@ -1,14 +1,14 @@
-"""Lattice droplet proxy: fill holes in the largest four-connected plus cluster."""
+"""Northwest-resolved Peierls contours and filled droplet geometry."""
 import numpy as np
 from scipy.ndimage import binary_fill_holes
+from ..geometry.square import NW_CONNECTIVITY
 
 
 def droplet_mask(labels, counts):
     if not len(counts):
         return np.zeros(labels.shape, dtype=bool)
-    # Eight-connected background avoids closing diagonal escape channels.
     return binary_fill_holes(labels == (int(np.argmax(counts))+1),
-                             structure=np.ones((3, 3), dtype=bool))
+                             structure=NW_CONNECTIVITY)
 
 
 def droplet_geometry(mask):
@@ -34,3 +34,50 @@ def droplet_geometry(mask):
                       aspect_ratio=float(np.sqrt(eigenvalues[1]/eigenvalues[0])) if eigenvalues[0]>0 else None,
                       compactness=float(4*np.pi*area/perimeter**2))
     return result
+
+
+def peierls_contours(state):
+    """Trace closed dual-edge walks, with plus spins on the right.
+
+    Coordinates are in padded-array row/column units (half integers).
+    At alternating plaquettes pair N-W and S-E. A walk may revisit a
+    vertex, but never an edge; the ordered edges encode the resolution.
+    """
+    outgoing = {}
+
+    def add_edge(start, end, plus_on_right):
+        if not plus_on_right:
+            start, end = end, start
+        outgoing.setdefault(start, []).append(end)
+
+    # Integer dual coordinates denote the upper-left site of a plaquette.
+    for row, col in np.argwhere(state[:, :-1] != state[:, 1:]):
+        row, col = int(row), int(col)
+        add_edge((row-1, col), (row, col), state[row, col] == 1)
+    for row, col in np.argwhere(state[:-1, :] != state[1:, :]):
+        row, col = int(row), int(col)
+        add_edge((row, col-1), (row, col), state[row+1, col] == 1)
+
+    pairing = {(-1, 0): (0, -1), (0, -1): (-1, 0),
+               (1, 0): (0, 1), (0, 1): (1, 0)}
+    remaining = {(start, end) for start, ends in outgoing.items() for end in ends}
+    contours = []
+    while remaining:
+        first = next(iter(remaining))
+        start, end = first
+        vertices = [start]
+        while True:
+            remaining.remove((start, end))
+            vertices.append(end)
+            candidates = outgoing[end]
+            if len(candidates) == 1:
+                following = candidates[0]
+            else:
+                incoming = (start[0]-end[0], start[1]-end[1])
+                dr, dc = pairing[incoming]
+                following = (end[0]+dr, end[1]+dc)
+            start, end = end, following
+            if (start, end) == first:
+                break
+        contours.append(np.asarray(vertices, dtype=float) + 0.5)
+    return contours

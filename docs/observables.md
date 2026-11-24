@@ -36,7 +36,7 @@ The energy values are totals, not per-site averages. `bond_sum` returns $B-2L$ u
 
 ## Geometric plus clusters
 
-Use `cluster_details=True`. Let $A_1\geq A_2\geq\cdots$ denote the sizes of four-neighbour connected plus components. These are geometric clusters, not Fortuin–Kasteleyn bond components.
+Use `cluster_details=True`. Let $A_1\geq A_2\geq\cdots$ denote the sizes of northwest-connected plus components. These are geometric clusters, not Fortuin–Kasteleyn bond components.
 
 | Output | Definition |
 |---|---|
@@ -50,11 +50,17 @@ Use `cluster_details=True`. Let $A_1\geq A_2\geq\cdots$ denote the sizes of four
 
 Missing first or second component sizes are taken as zero for the fraction calculations.
 
+The shared `NW_CONNECTIVITY` structure is `[[0,1,1],[1,1,1],[1,1,0]]`. It adds NE–SW diagonal adjacency for both spin values, equivalent to pairing north–west and south–east dual edges at alternating plaquettes. This is spin-flip symmetric but not invariant under quarter turns. No diagonal physical interactions or FK bonds are added. Historical geometric statistics and thresholds using four-neighbor clusters are not directly comparable. Existing first-passage experiments use magnetization and are unchanged.
+
+## Explicit Peierls contours
+
+`peierls_contours(state)` returns closed arrays of half-integer `(row, column)` coordinates in padded-array units, oriented with plus spins on the right. Total edge length equals `interface_length(state)`. At a degree-four vertex the ordered edge sequence encodes the northwest resolution; raw plots can show touching vertices. The tracer is opt-in and is not called by `observe(contours=True)`, which computes mask geometry only.
+
 ## Exterior droplet proxy
 
 ![Spin configuration, largest component and filled droplet](figures/clusters.svg)
 
-With `contours=True`, the largest four-connected plus component is selected (ties use the first component in row-major labeling order). Holes are filled using an eight-connected complement, so diagonal escape channels remain open. The result is a discrete proxy, not a rigorous Peierls contour or macroscopic phase estimator.
+With `contours=True`, the largest northwest-connected plus component is selected (ties use the first component in row-major labeling order). Holes are filled with the same connectivity. NE–SW diagonal escape channels remain open; NW–SE-only channels are closed. The filled mask is bounded by the selected component’s external Peierls contour, but is not necessarily the region enclosed by the largest-area contour. It is not a macroscopic phase estimator.
 
 Write $D$ for the filled mask, $A=|D|$, $P$ for the number of edges separating the mask from its complement, and $C$ for the covariance matrix of occupied site coordinates.
 

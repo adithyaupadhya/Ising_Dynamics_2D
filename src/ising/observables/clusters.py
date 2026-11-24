@@ -1,10 +1,11 @@
-"""Four-connected geometric plus clusters, not FK clusters."""
+"""Northwest-connected geometric plus clusters, not FK clusters."""
 import numpy as np
 from scipy.ndimage import label
+from ..geometry.square import NW_CONNECTIVITY as NW_CONNECTIVITY, interior
 
 
 def plus_components(state):
-    component_labels, _ = label(state[1:-1, 1:-1] == 1)
+    component_labels, _ = label(interior(state) == 1, structure=NW_CONNECTIVITY)
     component_sizes = np.bincount(component_labels.ravel())[1:]
     return component_labels, component_sizes
 
@@ -24,5 +25,5 @@ def cluster_statistics(labels, counts, min_size=1):
 
 def largest_plus_fraction(state):
     _, component_sizes = plus_components(state)
-    return float(component_sizes.max(initial=0)/(state.shape[0]-2)**2)
+    return float(component_sizes.max(initial=0)/interior(state).size)
 

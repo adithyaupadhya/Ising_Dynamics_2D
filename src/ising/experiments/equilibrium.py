@@ -9,7 +9,7 @@ def equilibrium_check(model: IsingModel, steps: int = 100000, burn: int = 500, *
     if steps < 20 or burn < 0:
         raise ValueError('Require at least 20 samples and nonnegative burn-in')
     w,bonds,msum = exact_small(model.N,model.beta,model.lam)
-    exact = {'m':float(w@msum/model.N**2),'bond sum':float(w@bonds),'P(all -)':float(w[0])}
+    exact = {'m':float(w@msum/model.num_sites),'bond sum':float(w@bonds),'P(all -)':float(w[0])}
     rows = []
     for dynamics in ('heatbath','metropolis','sw-ghost','sw-size'):
         sim = Simulator(model,seed=seed,dynamics=dynamics,backend=backend)

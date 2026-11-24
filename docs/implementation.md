@@ -65,3 +65,41 @@ ising benchmark --size 32 64 128 256
 ```
 
 Record hardware, OS, Python and dependency versions with any newly reported timings.
+
+## Geometry boundary
+
+The supported model is still the two-dimensional square box with a fixed minus
+frame. `model.geometry` returns an immutable `SquareLattice(N)`; no new lattice
+or graph is implemented. The constructor `IsingModel(N, beta, lam)` and the
+field scaling `h = lam/N` are unchanged.
+
+`ising.geometry.square` owns the state layout, dynamic vertex count, physical
+bond count, coordination number, critical inverse temperature, padded-index
+mapping, physical edge views, boundary validation and NW geometric connectivity.
+The geometry also selects the square-specific update kernels and observable
+implementation. `Simulator` and `MonotoneCoupling` use the geometry to construct
+states, choose kernels once, and convert update counts to sweeps. The random
+stream uses the geometry's site mapping but retains the original draw order.
+Energy bookkeeping now uses the number of sites and bonds rather than formulas
+for a square box; `thermodynamics(N, ...)` remains the square-box convenience API.
+
+For future extensions:
+
+- A hypercubic lattice can supply a different padded shape, site mapping, bond
+  views, degree and specialized kernels. The same state/clock/stream structure
+  can be reused. A triangular or honeycomb lattice may instead use skew or
+  parity-dependent neighbors and its own boundary rules.
+- The local kernel arguments and cluster kernel are selected outside the update
+  loops. Existing square kernels intentionally retain their explicit neighbor
+  accesses and bond sampling order. Generic or new optimized kernels can be
+  introduced alongside them, rather than replacing tested code now.
+- Geometric observables are still square-specific: the NW matrix is only a
+  geometric convention, not an interaction graph. Other planar lattices require
+  their own contour topology and physical embedding; higher-dimensional lattices
+  require surface observables. The current observable names are retained.
+- Exact enumeration uses the physical bond views but the public `exact_small`
+  function, CLI, experiment parameter schemas and visualization remain square
+  specific. Generalizing the model constructor and field scaling is a separate
+  future API decision, not part of this refactor.
+
+No per-site Python geometry dispatch or explicit adjacency matrix is introduced.
