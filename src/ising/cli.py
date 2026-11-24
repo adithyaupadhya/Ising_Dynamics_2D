@@ -3,7 +3,7 @@ import argparse
 from pathlib import Path
 import numpy as np
 
-from .model import IsingModel, validate_algorithm
+from .model import IsingModel, validate_algorithm, DYNAMICS
 from .experiments import run, field_scan, equilibrium_check, first_passage, coalescence as coupling_trials
 from .visualization.animation import save_animation
 from .benchmarks.benchmark import run_benchmark
@@ -110,12 +110,12 @@ Run ising COMMAND --help for options and defaults.''')
                            default=field, help='rescaled field lambda (physical field = lambda/N)')
         r = p.add_argument_group('Dynamics and reproducibility')
         if dynamics:
-            r.add_argument('--dynamics', choices=['heatbath', 'metropolis', 'sw'],
-                           default='heatbath', help='transition kernel; sw = Swendsen-Wang')
+            r.add_argument('--dynamics', choices=DYNAMICS,
+                           default='heatbath', help='transition kernel; sw-ghost and sw-size are cluster variants')
         if init:
             r.add_argument('--init', choices=init, default='minus', help='initial spin configuration')
         r.add_argument('--backend', choices=['numba', 'python'], default='numba',
-                       help='compiled or reference local kernel (not applicable to SW)')
+                       help='compiled or reference kernel')
         r.add_argument('--seed', type=nonnegative, default=seed, help='random seed')
 
     p = command('series', 'Print a magnetization trajectory.', cmd_series)
@@ -147,7 +147,7 @@ Run ising COMMAND --help for options and defaults.''')
             p.add_argument('--threshold',type=float,default=0.,help='magnetization threshold; upward from minus, downward from plus')
         p.add_argument('--workers',type=positive,default=1,help='parallel worker processes')
         p.add_argument('--resume',action='store_true',help='resume an existing matching study')
-    p = command('benchmark', 'Compare Python and Numba random-site sweep timings.', cmd_benchmark)
+    p = command('benchmark', 'Compare Python and Numba sweep timings for all dynamics.', cmd_benchmark)
     p.add_argument('-N','--size','--N',dest='N',type=positive,nargs='+',default=[32,64,128,256],help='lattice sizes')
     return parser
 

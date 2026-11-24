@@ -3,7 +3,7 @@ import numpy as np
 from .model import IsingModel, validate_algorithm
 from .random_stream import RandomUpdateStream
 from .state import make_state
-from .kernels import local_tables, random_updates_python, random_updates_numba, sw_step
+from .kernels import local_tables, random_updates_python, random_updates_numba, CLUSTER_KERNELS
 from . import observables as obs
 
 
@@ -23,6 +23,7 @@ class Simulator:
         self._hb, self._mp = local_tables(model)
         self._kernel = (random_updates_numba if backend == 'numba'
                         else random_updates_python)
+        self._cluster_kernel = CLUSTER_KERNELS.get((dynamics, backend))
         self._stream = RandomUpdateStream(model.N, self.rng)
 
     @property
@@ -56,7 +57,7 @@ class Simulator:
 
     @property
     def t(self) -> float:
-        return self.updates if self.dynamics == 'sw' else self.updates / self.model.N**2
+        return self.updates if self._cluster_kernel is not None else self.updates / self.model.N**2
 
     @property
     def magnetization(self) -> float:
@@ -68,8 +69,8 @@ class Simulator:
         if direction and direction*self.magnetization >= direction*threshold:
             return True
         while count:
-            if self.dynamics == 'sw':
-                sw_step(self._state, c.beta, c.h, self.rng)
+            if self._cluster_kernel is not None:
+                self._cluster_kernel(self._state, c.beta, c.h, self.rng)
                 self._spin_sum = int(self._state[1:-1, 1:-1].sum())
                 self._length = obs.interface_length(self._state)
                 self.updates += 1
@@ -89,7 +90,7 @@ class Simulator:
     def advance(self, sweeps: int = 1):
         if not isinstance(sweeps, int) or sweeps < 0:
             raise ValueError('sweeps must be a nonnegative integer')
-        self._advance(sweeps * (1 if self.dynamics == 'sw' else self.model.N**2))
+        self._advance(sweeps * (1 if self._cluster_kernel is not None else self.model.N**2))
         return self
 
     def advance_updates(self, count: int = 1):
@@ -102,7 +103,7 @@ class Simulator:
         """Advance at most limit sweeps, checking after every elementary update."""
         if not isinstance(limit, int) or limit < 0 or direction not in (-1, 1) or not -1 <= threshold <= 1:
             raise ValueError('Invalid passage parameters')
-        return self._advance(limit * (1 if self.dynamics == 'sw' else self.model.N**2), direction, threshold)
+        return self._advance(limit * (1 if self._cluster_kernel is not None else self.model.N**2), direction, threshold)
 
     def observe(self, clusters=True, *, thermodynamic=True, cluster_details=False,
                 contours=False, boundary_profile=False, interface_heights=False,

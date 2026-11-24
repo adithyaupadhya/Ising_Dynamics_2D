@@ -8,7 +8,7 @@ class TestEngine(unittest.TestCase):
 
     def test_boundaries_and_reproducibility(self):
         for n in (1, 3, 4):
-            for d in ('heatbath', 'metropolis', 'sw'):
+            for d in ('heatbath', 'metropolis', 'sw-ghost', 'sw-size'):
                 for backend in ('python', 'numba'):
                     a = Simulator(IsingModel(n, 0.5, 3.0), 'random', 4, dynamics=d, backend=backend)
                     b = Simulator(a.model, 'random', 4, dynamics=d, backend=backend)
@@ -40,7 +40,7 @@ class TestEngine(unittest.TestCase):
         w, _, _ = exact_small(1, beta, lam)
         expected = 1 / (1 + np.exp(-2 * beta * (lam - 4)))
         self.assertAlmostEqual(w[1], expected)
-        for d in ('heatbath', 'metropolis', 'sw'):
+        for d in ('heatbath', 'metropolis', 'sw-ghost', 'sw-size'):
             a = Simulator(IsingModel(1, beta, lam), 'minus', 52, dynamics=d)
             a.advance(100)
             vals = []

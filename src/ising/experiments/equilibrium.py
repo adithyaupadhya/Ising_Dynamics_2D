@@ -11,7 +11,7 @@ def equilibrium_check(model: IsingModel, steps: int = 100000, burn: int = 500, *
     w,bonds,msum = exact_small(model.N,model.beta,model.lam)
     exact = {'m':float(w@msum/model.N**2),'bond sum':float(w@bonds),'P(all -)':float(w[0])}
     rows = []
-    for dynamics in ('heatbath','metropolis','sw'):
+    for dynamics in ('heatbath','metropolis','sw-ghost','sw-size'):
         sim = Simulator(model,seed=seed,dynamics=dynamics,backend=backend)
         sim.advance(burn)
         series = {k:[] for k in exact}

@@ -6,7 +6,7 @@ from ising.observables import interface_length, bond_sum
 class TestObservables(unittest.TestCase):
 
     def test_incremental_energy(self):
-        for dyn in ('heatbath', 'metropolis', 'sw'):
+        for dyn in ('heatbath', 'metropolis', 'sw-ghost', 'sw-size'):
             for backend in ('python', 'numba'):
                 s = Simulator(IsingModel(5, 0.5, 3), 'random', 42, dynamics=dyn, backend=backend)
                 for _ in range(35):

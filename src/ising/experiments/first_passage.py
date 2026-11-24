@@ -13,7 +13,7 @@ def trial(task: dict) -> dict:
     start = time.perf_counter()
     event = sim.first_passage(limit, threshold, 1 if init == 'minus' else -1)
     return dict(N=model.N, beta=model.beta, **{'lambda': model.lam}, h=model.h,
-                dynamics=dynamics, backend=backend if dynamics != 'sw' else 'n/a',
+                dynamics=dynamics, backend=backend,
                 init=init, threshold=threshold, replicate=task['replicate'], seed=task['seed'],
                 limit_sweeps=limit, sweeps=sim.t, updates=sim.updates,
                 event=int(event), final_m=sim.magnetization, elapsed_seconds=time.perf_counter()-start)

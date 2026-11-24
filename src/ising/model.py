@@ -20,8 +20,11 @@ class IsingModel:
         return self.lam / self.N
 
 
+DYNAMICS = ("heatbath", "metropolis", "sw-ghost", "sw-size")
+
+
 def validate_algorithm(dynamics: str, backend: str) -> None:
-    if dynamics not in ("heatbath", "metropolis", "sw"):
+    if dynamics not in DYNAMICS:
         raise ValueError("Unknown dynamics")
     if backend not in ("python", "numba"):
         raise ValueError("Unknown backend")

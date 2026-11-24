@@ -1,4 +1,4 @@
-"""Time identical random-site kernels, including random generation, after warmup."""
+"""Time reference and compiled kernels, including random generation, after warmup."""
 import time
 import numpy as np
 from ising import IsingModel, Simulator
@@ -17,7 +17,7 @@ def elapsed(sim, repeats):
 def run_benchmark(sizes) -> list[dict]:
     rows = []
     for n in sizes:
-        for dynamics in ('heatbath','metropolis'):
+        for dynamics in ('heatbath','metropolis','sw-ghost','sw-size'):
             times = [elapsed(Simulator(IsingModel(n,.5,3.), 'random',42,dynamics=dynamics,backend=b),
                              max(5,32768//(n*n))) for b in ('python','numba')]
             rows.append(dict(N=n,dynamics=dynamics,python_ms=times[0]*1000,numba_ms=times[1]*1000,speedup=times[0]/times[1]))

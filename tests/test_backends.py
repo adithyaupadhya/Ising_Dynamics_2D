@@ -17,12 +17,12 @@ class TestBackends(unittest.TestCase):
 
     def test_first_passage_matches_single_steps(self):
         for backend in ('python', 'numba'):
-            for dynamics in ('heatbath', 'metropolis', 'sw'):
+            for dynamics in ('heatbath', 'metropolis', 'sw-ghost', 'sw-size'):
                 for init, direction in [('minus', 1), ('plus', -1)]:
                     c = IsingModel(3, 0.5, 3.0)
                     a, b = (Simulator(c, init, 12, dynamics=dynamics, backend=backend), Simulator(c, init, 12, dynamics=dynamics, backend=backend))
                     hit = a.first_passage(100, 0, direction)
-                    limit = 100 if dynamics == 'sw' else 900
+                    limit = 100 if dynamics.startswith('sw-') else 900
                     while b.updates < limit and direction * b.magnetization < 0:
                         b.advance_updates()
                     self.assertEqual(hit, direction * b.magnetization >= 0)

@@ -8,7 +8,7 @@ from .trajectory import run
 def field_scan(N: int, beta: float, fields, sweeps: int, *, seed: int = 0, backend: str = 'numba') -> list[dict]:
     rows = []
     for lam in fields:
-        for dynamics in ('metropolis','heatbath','sw'):
+        for dynamics in ('metropolis','heatbath','sw-ghost','sw-size'):
             for init in ('minus','plus'):
                 state, series = run(IsingModel(N,beta,lam), sweeps, init=init, seed=seed, dynamics=dynamics, backend=backend)
                 tail = [r['magnetization'] for r in series if r['sweep'] >= sweeps/2]

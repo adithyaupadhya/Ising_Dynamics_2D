@@ -9,8 +9,8 @@ def _components(n, a, b):
     graph = coo_matrix((np.ones(len(a), dtype=np.int8), (a, b)), shape=(n, n))
     return connected_components(graph, directed=False)[1]
 
-def sw_step(s, beta, h, rng):
-    """One Swendsen-Wang step with a ghost + spin (field) and a fixed - frame."""
+def _sw_step_scipy(s, beta, h, rng, ghost):
+    """Sparse-graph reference for either cluster transition rule."""
     N = s.shape[0] - 2
     n = N * N
     MINUS, PLUS = n, n + 1
@@ -29,14 +29,111 @@ def sw_step(s, beta, h, rng):
         m = flag & (rng.random(N) < p)
         ea.append(site[m])
         eb.append(np.full(int(m.sum()), MINUS))
-    g = (core == 1) & (rng.random((N, N)) < pg)
-    ea.append(ids[g])
-    eb.append(np.full(int(g.sum()), PLUS))
-    lab = _components(n + 2, np.concatenate(ea), np.concatenate(eb))
-    new = rng.integers(0, 2, int(lab.max()) + 1).astype(np.int8) * 2 - 1
+    if ghost:
+        g = (core == 1) & (rng.random((N, N)) < pg)
+        ea.append(ids[g])
+        eb.append(np.full(int(g.sum()), PLUS))
+    lab = _components(n + 1 + int(ghost), np.concatenate(ea), np.concatenate(eb))
+    count = int(lab.max()) + 1
+    if ghost:
+        new = rng.integers(0, 2, count).astype(np.int8) * 2 - 1
+        new[lab[PLUS]] = 1
+    else:
+        sizes = np.bincount(lab[:n], minlength=count)
+        prob = 1 / (1 + np.exp(-2 * beta * h * sizes))
+        new = np.where(rng.random(count) < prob, 1, -1).astype(np.int8)
     new[lab[MINUS]] = -1
-    new[lab[PLUS]] = 1
     s[1:-1, 1:-1] = new[lab[:n]].reshape(N, N)
+
+
+@njit(cache=True)
+def _root(parent, vertex):
+    """Find a component representative with path halving."""
+    while parent[vertex] != vertex:
+        parent[vertex] = parent[parent[vertex]]
+        vertex = parent[vertex]
+    return vertex
+
+
+@njit(cache=True)
+def _join(parent, sizes, a, b):
+    """Merge components by size."""
+    a, b = _root(parent, a), _root(parent, b)
+    if a != b:
+        if sizes[a] < sizes[b]:
+            a, b = b, a
+        parent[b] = a
+        sizes[a] += sizes[b]
+
+
+@njit(cache=True)
+def _sw_step_numba(s, beta, h, rng, ghost):
+    """Sample bonds and merge directly, then recolor each free component."""
+    N = s.shape[0] - 2
+    n = N * N
+    minus, plus = n, n + 1
+    p = -np.expm1(-2 * beta)
+    pg = -np.expm1(-2 * beta * h) if ghost else 0.0
+    vertices = n + 2 if ghost else n + 1
+    parent = np.arange(vertices)
+    sizes = np.ones(vertices, np.int64)
+    for i in range(N):
+        for j in range(N):
+            a = i * N + j
+            spin = s[i + 1, j + 1]
+            # Each interior edge is tested exactly once.
+            if j + 1 < N and spin == s[i + 1, j + 2] and rng.random() < p:
+                _join(parent, sizes, a, a + 1)
+            if i + 1 < N and spin == s[i + 2, j + 1] and rng.random() < p:
+                _join(parent, sizes, a, a + N)
+            if spin == -1:
+                # Corners have two boundary edges (N=1 has four).
+                if i == 0 and rng.random() < p:
+                    _join(parent, sizes, a, minus)
+                if i == N - 1 and rng.random() < p:
+                    _join(parent, sizes, a, minus)
+                if j == 0 and rng.random() < p:
+                    _join(parent, sizes, a, minus)
+                if j == N - 1 and rng.random() < p:
+                    _join(parent, sizes, a, minus)
+            elif ghost and rng.random() < pg:
+                _join(parent, sizes, a, plus)
+
+    colors = np.zeros(vertices, np.int8)
+    colors[_root(parent, minus)] = -1
+    if ghost:
+        colors[_root(parent, plus)] = 1
+    for a in range(n):
+        root = _root(parent, a)
+        if colors[root] == 0:
+            # Free components contain no auxiliary vertices.
+            prob = .5 if ghost else 1 / (1 + np.exp(-2 * beta * h * sizes[root]))
+            colors[root] = 1 if rng.random() < prob else -1
+        s[a // N + 1, a % N + 1] = colors[root]
+
+
+def sw_ghost_python(s, beta, h, rng):
+    _sw_step_scipy(s, beta, h, rng, True)
+
+
+def sw_size_python(s, beta, h, rng):
+    _sw_step_scipy(s, beta, h, rng, False)
+
+
+def sw_ghost_numba(s, beta, h, rng):
+    _sw_step_numba(s, beta, h, rng, True)
+
+
+def sw_size_numba(s, beta, h, rng):
+    _sw_step_numba(s, beta, h, rng, False)
+
+
+CLUSTER_KERNELS = {
+    ('sw-ghost', 'python'): sw_ghost_python,
+    ('sw-ghost', 'numba'): sw_ghost_numba,
+    ('sw-size', 'python'): sw_size_python,
+    ('sw-size', 'numba'): sw_size_numba,
+}
 
 
 def local_tables(model):
