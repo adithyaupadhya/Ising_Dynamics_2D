@@ -9,15 +9,15 @@ from .kernels import local_tables
 
 def coupled_updates_python(lower, upper, w, sites, uniforms, hb, disagreement):
     """Apply shared site/uniform pairs, stopping exactly at coalescence."""
-    for i in range(len(sites)):
-        p = sites[i]
-        disagreement -= int(lower[p] != upper[p])
-        for state in (lower, upper):
-            k = (int(state[p-1])+int(state[p+1])+int(state[p-w])+int(state[p+w])+4)//2
-            state[p] = 1 if uniforms[i] < hb[k] else -1
-        disagreement += int(lower[p] != upper[p])
+    for update_idx in range(len(sites)):
+        site = sites[update_idx]
+        disagreement -= int(lower[site] != upper[site])
+        for flat_spins in (lower, upper):
+            num_plus_neighbors = (int(flat_spins[site-1])+int(flat_spins[site+1])+int(flat_spins[site-w])+int(flat_spins[site+w])+4)//2
+            flat_spins[site] = 1 if uniforms[update_idx] < hb[num_plus_neighbors] else -1
+        disagreement += int(lower[site] != upper[site])
         if disagreement == 0:
-            return i+1, disagreement
+            return update_idx+1, disagreement
     return len(sites), disagreement
 
 
@@ -74,15 +74,15 @@ class MonotoneCoupling:
     def advance_updates(self, count: int = 1):
         if not isinstance(count, int) or count<0:
             raise ValueError('count must be a nonnegative integer')
-        n = self.model.N
+        N = self.model.N
         while count and not self.coalesced:
             sites, uniforms = self._stream.peek(count)
-            used, self._disagreement = self._kernel(
-                self._lower.ravel(), self._upper.ravel(), n+2, sites, uniforms,
+            attempts_used, self._disagreement = self._kernel(
+                self._lower.ravel(), self._upper.ravel(), N+2, sites, uniforms,
                 self._hb, self._disagreement)
-            self._stream.consume(used)
-            self.updates += used
-            count -= used
+            self._stream.consume(attempts_used)
+            self.updates += attempts_used
+            count -= attempts_used
         return self
 
     def advance(self, sweeps: int = 1):

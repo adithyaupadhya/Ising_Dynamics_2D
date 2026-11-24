@@ -12,10 +12,10 @@ class RandomUpdateStream:
     def peek(self, count: int) -> tuple[np.ndarray, np.ndarray]:
         """Return up to count pending draws without consuming them."""
         if not len(self._sites):
-            n = self.N
-            ids = self.rng.integers(0, n*n, size=n*n)
-            self._sites = (ids//n+1)*(n+2)+ids%n+1
-            self._uniforms = self.rng.random(n*n)
+            N = self.N
+            site_ids = self.rng.integers(0, N*N, size=N*N)
+            self._sites = (site_ids//N+1)*(N+2)+site_ids%N+1
+            self._uniforms = self.rng.random(N*N)
         return self._sites[:count], self._uniforms[:count]
 
     def consume(self, count: int) -> None:
