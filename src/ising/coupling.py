@@ -1,27 +1,9 @@
 """Grand monotone coupling of extremal random-site heat-bath chains."""
 import numpy as np
-from numba import njit
 from .model import IsingModel, validate_algorithm
 from .random_stream import RandomUpdateStream
 from .state import make_state
-from .kernels import local_tables
-
-
-def coupled_updates_python(lower, upper, w, sites, uniforms, hb, disagreement):
-    """Apply shared site/uniform pairs, stopping exactly at coalescence."""
-    for update_idx in range(len(sites)):
-        site = sites[update_idx]
-        disagreement -= int(lower[site] != upper[site])
-        for flat_spins in (lower, upper):
-            num_plus_neighbors = (int(flat_spins[site-1])+int(flat_spins[site+1])+int(flat_spins[site-w])+int(flat_spins[site+w])+4)//2
-            flat_spins[site] = 1 if uniforms[update_idx] < hb[num_plus_neighbors] else -1
-        disagreement += int(lower[site] != upper[site])
-        if disagreement == 0:
-            return update_idx+1, disagreement
-    return len(sites), disagreement
-
-
-coupled_updates_numba = njit(cache=True)(coupled_updates_python)
+from .kernels.local import local_tables, coupled_updates_python, coupled_updates_numba
 
 
 class MonotoneCoupling:

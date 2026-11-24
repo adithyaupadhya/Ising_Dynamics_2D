@@ -3,7 +3,8 @@ import numpy as np
 from .model import IsingModel, validate_algorithm
 from .random_stream import RandomUpdateStream
 from .state import make_state
-from .kernels import local_tables, random_updates_python, random_updates_numba, CLUSTER_KERNELS
+from .kernels.local import local_tables, random_updates_python, random_updates_numba
+from .kernels.cluster import CLUSTER_KERNELS
 from . import observables as obs
 
 
@@ -64,25 +65,38 @@ class Simulator:
         return self._spin_sum / self.model.N**2
 
     def _advance(self, count, direction=0, threshold=0.0):
-        model = self.model
-        num_sites = model.N**2
         if direction and direction*self.magnetization >= direction*threshold:
             return True
+        if self._cluster_kernel is None:
+            return self._advance_local(count, direction, threshold)
+        return self._advance_cluster(count, direction, threshold)
+
+    def _advance_local(self, count, direction, threshold):
+        """Advance sequential attempts, preserving unused random draws."""
+        model = self.model
+        num_sites = model.N**2
         while count:
-            if self._cluster_kernel is not None:
-                self._cluster_kernel(self._state, model.beta, model.h, self.rng)
-                self._spin_sum = int(self._state[1:-1, 1:-1].sum())
-                self._length = obs.interface_length(self._state)
-                self.updates += 1
-                count -= 1
-            else:
-                sites, uniforms = self._stream.peek(count)
-                attempts_used, self._spin_sum, self._length = self._kernel(
-                    self._state.ravel(), model.N+2, sites, uniforms, self._hb, self._mp,
-                    self.dynamics == 'heatbath', self._spin_sum, self._length, direction, threshold, num_sites)
-                self._stream.consume(attempts_used)
-                self.updates += attempts_used
-                count -= attempts_used
+            sites, uniforms = self._stream.peek(count)
+            attempts_used, self._spin_sum, self._length = self._kernel(
+                self._state.ravel(), model.N+2, sites, uniforms, self._hb, self._mp,
+                self.dynamics == 'heatbath', self._spin_sum, self._length,
+                direction, threshold, num_sites)
+            self._stream.consume(attempts_used)
+            self.updates += attempts_used
+            count -= attempts_used
+            if direction and direction*self.magnetization >= direction*threshold:
+                return True
+        return False
+
+    def _advance_cluster(self, count, direction, threshold):
+        """Advance whole cluster steps and recompute incremental statistics."""
+        model = self.model
+        while count:
+            self._cluster_kernel(self._state, model.beta, model.h, self.rng)
+            self._spin_sum = int(self._state[1:-1, 1:-1].sum())
+            self._length = obs.interface_length(self._state)
+            self.updates += 1
+            count -= 1
             if direction and direction*self.magnetization >= direction*threshold:
                 return True
         return False

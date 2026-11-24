@@ -1,5 +1,7 @@
 """Unified command-line interface for Ising simulations and experiments."""
 import argparse
+import csv
+import sys
 from pathlib import Path
 import numpy as np
 
@@ -7,9 +9,25 @@ from .model import IsingModel, validate_algorithm, DYNAMICS
 from .experiments import run, field_scan, equilibrium_check, first_passage, coalescence as coupling_trials
 from .visualization.animation import save_animation
 from .benchmarks.benchmark import run_benchmark
-import csv
-import sys
 
+
+# Argument validators
+
+def positive(value):
+    n = int(value)
+    if n < 1:
+        raise argparse.ArgumentTypeError('must be a positive integer')
+    return n
+
+
+def nonnegative(value):
+    n = int(value)
+    if n < 0:
+        raise argparse.ArgumentTypeError('must be nonnegative')
+    return n
+
+
+# Command handlers
 
 def cmd_series(a):
     _, series = run(IsingModel(a.N,a.beta,a.lam), a.sweeps, init=a.init,seed=a.seed,dynamics=a.dynamics,backend=a.backend,record_every=a.record_every or max(1,a.sweeps//40))
@@ -42,12 +60,12 @@ def progress(done,total,row):
     print(f"Trial {done}/{total}: N={row['N']}, t={row['sweeps']:g}, event={row['event']}",flush=True)
 
 
-def passage(a):
+def cmd_passage(a):
     first_passage(a.N,beta=a.beta,lam=a.lam,dynamics=a.dynamics,backend=a.backend,init=a.init,threshold=a.threshold,limit=a.limit,replicates=a.replicates,seed=a.seed,workers=a.workers,output=a.out,resume=a.resume,progress=progress)
     print(f'Wrote {a.out}/trials.csv')
 
 
-def coalescence(a):
+def cmd_coalescence(a):
     coupling_trials(a.N,beta=a.beta,lam=a.lam,backend=a.backend,limit=a.limit,replicates=a.replicates,seed=a.seed,workers=a.workers,output=a.out,resume=a.resume,progress=progress)
     print(f'Wrote {a.out}/trials.csv')
 
@@ -59,19 +77,7 @@ def cmd_benchmark(a):
     writer.writerows(rows)
 
 
-def positive(value):
-    n = int(value)
-    if n < 1:
-        raise argparse.ArgumentTypeError('must be a positive integer')
-    return n
-
-
-def nonnegative(value):
-    n = int(value)
-    if n < 0:
-        raise argparse.ArgumentTypeError('must be nonnegative')
-    return n
-
+# Parser construction
 
 def build_parser():
     parser = argparse.ArgumentParser(
@@ -135,8 +141,8 @@ Run ising COMMAND --help for options and defaults.''')
     p.add_argument('--steps', type=positive, default=100000, help='observed sweeps per dynamics (at least 20)')
     p.add_argument('--burn', type=nonnegative, default=500, help='discarded initial sweeps')
     for name, handler, description, sizes, reps, seed, output in [
-        ('passage', passage, 'Measure replicated magnetization first-passage times.', [32,48,64], 10, 12345, 'results/passage'),
-        ('coalescence', coalescence, 'Measure extremal heat-bath coupling times.', [32], 20, 0, 'results/coalescence')]:
+        ('passage', cmd_passage, 'Measure replicated magnetization first-passage times.', [32,48,64], 10, 12345, 'results/passage'),
+        ('coalescence', cmd_coalescence, 'Measure extremal heat-bath coupling times.', [32], 20, 0, 'results/coalescence')]:
         p = command(name, description, handler)
         model(p, size=sizes, beta=.5, field=3., multiple=True, seed=seed,
               dynamics=name=='passage', init=['minus','plus'] if name=='passage' else None)
@@ -151,6 +157,8 @@ Run ising COMMAND --help for options and defaults.''')
     p.add_argument('-N','--size','--N',dest='N',type=positive,nargs='+',default=[32,64,128,256],help='lattice sizes')
     return parser
 
+
+# Entry point
 
 def main(argv=None):
     parser = build_parser()

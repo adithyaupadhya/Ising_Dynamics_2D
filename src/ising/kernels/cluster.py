@@ -1,8 +1,9 @@
-"""Transition kernels, independent of experiments and rendering."""
+"""Swendsen–Wang cluster transitions: sparse graphs and union–find."""
 import numpy as np
 from numba import njit
 from scipy.sparse import coo_matrix
 from scipy.sparse.csgraph import connected_components
+
 
 def _components(num_vertices, edge_u, edge_v):
     """Label connected components of the activated bond graph."""
@@ -134,40 +135,3 @@ CLUSTER_KERNELS = {
     ('sw-size', 'python'): sw_size_python,
     ('sw-size', 'numba'): sw_size_numba,
 }
-
-
-def local_tables(model):
-    """Build heat-bath and Metropolis lookup tables."""
-    local_fields = 2 * np.arange(5) - 4 + model.h
-    heatbath_probs = np.exp(-np.logaddexp(0., -2 * model.beta * local_fields))
-    metropolis_probs = np.exp(-model.beta * np.maximum(2 * np.array([-1, 1])[:, None] * local_fields, 0))
-    return heatbath_probs, metropolis_probs
-
-
-def random_updates_python(flat, w, sites, uniforms, hb, mp, heatbath,
-                          spin_sum, length, direction=0, threshold=0.0, area=1):
-    """Sequential random-site reference loop; stop at first threshold crossing.
-
-    direction=0 disables stopping; +1 means upward, -1 downward.
-    Return number of attempts consumed and updated total spin and broken-bond count.
-    """
-    for update_idx in range(len(sites)):
-        site = sites[update_idx]
-        num_plus_neighbors = (int(flat[site-1]) + int(flat[site+1]) + int(flat[site-w])
-             + int(flat[site+w]) + 4) // 2
-        old_spin = int(flat[site])
-        new_spin = old_spin
-        if heatbath:
-            new_spin = 1 if uniforms[update_idx] < hb[num_plus_neighbors] else -1
-        elif uniforms[update_idx] < mp[(old_spin+1)//2, num_plus_neighbors]:
-            new_spin = -old_spin
-        flat[site] = new_spin
-        spin_sum += new_spin - old_spin
-        length += ((old_spin-new_spin)//2)*(2*num_plus_neighbors-4)
-        if direction and direction * spin_sum / area >= direction * threshold:
-            return update_idx + 1, spin_sum, length
-    return len(sites), spin_sum, length
-
-
-# Compile the very same reference function, not a different transition rule.
-random_updates_numba = njit(cache=True)(random_updates_python)
