@@ -2,7 +2,7 @@
 
 A Monte Carlo simulator for the 2-D Ising model in a box of size $N$ with fixed minus boundary conditions and a positive external field $h_N=\lambda/N$. At this scaling of the external field, for a droplet of positive spins of size of the same order as the box, the interface cost and field gain to the energy are both of order $N$ as well, motivating studies of metastability, droplet geometry, boundary-layer fluctuations and mixing times.
 
-The project implements sequential random-site heat-bath and Metropolis dynamics, with both Python and Numba backends, as well as Swendsen–Wang cluster updates. It includes replicated experiments and statistical tools for interpreting their results.
+The project implements sequential random-site heat-bath and Metropolis dynamics, with both Python and Numba backends, as well as ghost-based (`sw-ghost`) and size-based (`sw-size`) Swendsen–Wang cluster updates, each with SciPy and Numba backends. It includes replicated experiments and statistical tools for interpreting their results.
 
 ![Illustration of a plus droplet in a minus background](docs/figures/droplet.svg)
 
@@ -53,7 +53,7 @@ sim.advance(100)  # 100 sweeps = 100 * N**2 attempted local updates
 print(sim.observe(contours=True, interface_heights=True))
 ```
 
-The Python and Numba local backends execute the same sequential transition function and reproduce the same seeded trajectories. The cluster algorithm uses a shared implementation.
+The Python and Numba local backends execute the same sequential transition function and reproduce the same seeded trajectories. The cluster backends implement the same transition rule within each variant, but use different random draw orders.
 
 ### Replicated experiments
 

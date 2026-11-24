@@ -4,7 +4,7 @@
 
 ## Reference and compiled kernels
 
-`src/ising/kernels.py` defines `random_updates_python` and its compiled counterpart, `random_updates_numba = njit(cache=True)(random_updates_python)`. Both heat bath and Metropolis use this same sequential loop. The Python reference already uses probability tables and shared random inputs, so benchmarks isolate the benefit of compilation rather than compare against an artificially slow algorithm. Numba remains an installed dependency even when selecting Python. Swendsen–Wang uses the same SciPy implementation for either backend.
+`src/ising/kernels.py` defines `random_updates_python` and its compiled counterpart, `random_updates_numba = njit(cache=True)(random_updates_python)`. Both heat bath and Metropolis use this same sequential loop. The Python reference already uses probability tables and shared random inputs, so benchmarks isolate the benefit of compilation rather than compare against an artificially slow algorithm. Numba remains an installed dependency even when selecting Python. Both Swendsen–Wang variants use a sparse SciPy graph for the `python` backend and a compiled disjoint-set (union–find) kernel for `numba`. Each activated bond merges two components directly; path compression and union by size avoid constructing a sparse matrix. The size-based variant evaluates its logistic probability once per free component, without a lookup table. The two cluster backends consume random draws in different orders: reproducibility holds within each backend, not across backends.
 
 ## Probability tables and padded arrays
 
@@ -47,12 +47,16 @@ The benchmark warms each backend for two sweeps, then reports the median of thre
 
 | N | Dynamics | Python (ms/sweep) | Numba (ms/sweep) | Speedup |
 |---:|---|---:|---:|---:|
-| 32 | Heat bath | 1.27150 | 0.03975 | 31.99× |
-| 64 | Heat bath | 4.82762 | 0.11795 | 40.93× |
-| 128 | Heat bath | 18.41081 | 0.46571 | 39.53× |
-| 256 | Heat bath | 72.41165 | 1.84637 | 39.22× |
+| 64 | heatbath | 3.6516 | 0.0952 | 38.37× |
+| 64 | metropolis | 3.8254 | 0.1095 | 34.95× |
+| 64 | sw-ghost | 0.5607 | 0.1498 | 3.74× |
+| 64 | sw-size | 0.4789 | 0.1478 | 3.24× |
+| 256 | heatbath | 61.4533 | 1.9057 | 32.25× |
+| 256 | metropolis | 60.1143 | 1.4124 | 42.56× |
+| 256 | sw-ghost | 6.4319 | 2.2538 | 2.85× |
+| 256 | sw-size | 6.1703 | 2.0274 | 3.04× |
 
-These are existing example measurements from [benchmark_results.csv](benchmark_results.csv), which also contains Metropolis results. These are not  performance guarantees. Both local algorithms require $O(N^2)$ work per sweep. The speedup concerns implementation overhead, not stochastic relaxation.
+These measurements were obtained on an AMD EPYC 9V74 CPU, Linux x86-64, Python 3.13.5, NumPy 2.3.5, SciPy 1.17.0 and Numba 0.65.1. The full results are in [benchmark_results.csv](benchmark_results.csv). These are simulator sweep timings, including thermodynamic bookkeeping but excluding rendering and other observables. Cluster backends implement the same transition law for each variant, not identical seeded trajectories. Speedup measures execution cost, not relaxation.
 
 To reproduce the current benchmark on your machine:
 

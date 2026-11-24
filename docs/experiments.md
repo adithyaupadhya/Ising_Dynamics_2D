@@ -16,7 +16,7 @@ The installed `ising` command (equivalently `python -m ising`) provides one inte
 | `ising coalescence` | Measure extremal coupling times |
 | `ising benchmark` | Compare reference and compiled local updates |
 
-Common model options are `--size` (side length), `--beta` or `--temperature` (reciprocals), and `--field` (rescaled field $\lambda$, not $h_N$). Where applicable, `--dynamics` selects `heatbath`, `metropolis` or `sw`; `--backend` selects `python` or `numba`; `--seed` specifies the random seed. Not all options apply to every command.
+Common model options are `--size` (side length), `--beta` or `--temperature` (reciprocals), and `--field` (rescaled field $\lambda$, not $h_N$). Where applicable, `--dynamics` selects `heatbath`, `metropolis`, `sw-ghost` or `sw-size`; `--backend` selects `python` or `numba`; `--seed` specifies the random seed. Not all options apply to every command.
 
 ## Trajectories and field scans
 
@@ -100,7 +100,7 @@ Illustrative passage record (selected columns only; not measured data):
 | 16 | 0 | 12.5 | 3200 | 1 |
 | 16 | 1 | 10000 | 2560000 | 0 |
 
-For SW, `backend` is recorded as `n/a`. Analyze censoring explicitly rather than averaging cutoff times as though they were events.
+For either cluster variant, `backend` records the selected SciPy or Numba implementation. Analyze censoring explicitly rather than averaging cutoff times as though they were events.
 
 ## Python API and checkpointing
 

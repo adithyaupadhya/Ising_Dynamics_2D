@@ -2,7 +2,7 @@
 
 [Home](../README.md) · [Model](model.md) · [Implementation](implementation.md)
 
-All three choices of reversible Markov chain dynamics have as the equilibrium measure the Gibbs measure defined in [Model](model.md). Write $k_x=\sum_{y\sim x}\sigma_y$ and $F_x=k_x+h_N$.
+All four choices of reversible Markov chain dynamics have as the equilibrium measure the Gibbs measure defined in [Model](model.md). Write $k_x=\sum_{y\sim x}\sigma_y$ and $F_x=k_x+h_N$.
 
 ## Heat bath
 
@@ -20,7 +20,7 @@ $$\min\{1,e^{-\beta\Delta H}\}.$$
 
 A rejected proposal leaves the configuration unchanged. This is also a reversible single-site Gibbs update.
 
-## Swendsen–Wang
+## Swendsen–Wang: ghost (`sw-ghost`)
 
 Random bonds are sampled conditional on the current configuration as follows:
 
@@ -30,13 +30,21 @@ Random bonds are sampled conditional on the current configuration as follows:
 
 This is a cluster Gibbs sampler using the random cluster representation. Its bond components are not the same as the geometric spin clusters measured by the observables.
 
+## Swendsen–Wang: size-based (`sw-size`)
+
+Bonds are drawn as above, except for the ones connected to the plus ghost. The component connected to the minus boundary stays negative. For each other component $C$ of size $A=|C|$, it is assigned a spin according to the probability
+
+$$P(\sigma_C=+1\mid\omega)=\frac{1}{1+e^{-2\beta h_N A}}.$$
+
+This is the conditional Gibbs distribution of the cluster sign given ordinary bonds. Both Swendsen-Wang variants are reversible for the same Gibbs measure, but their transition probabilities differ at positive field. Size-based recolouring integrates out ghost bonds and removes the conditional dependence on the previous cluster sign. 
+
 ## Time conventions
 
 | Property | Heat bath | Metropolis | Swendsen–Wang |
 |---|---|---|---|
 | Update | Site redraw | Flip attempt | Cluster step |
 | Sweep | $N^2$ updates | $N^2$ updates | $1$ update |
-| Backend | Python / Numba | Python / Numba | Shared SciPy implementation |
+| Backend | Python / Numba | Python / Numba | SciPy / Numba union–find (both variants) |
 | Implemented monotone coupling | Yes | No | No |
 
  Equal sweep counts do not imply equal computational cost or comparable physical relaxation times. 
