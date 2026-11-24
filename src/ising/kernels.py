@@ -14,26 +14,26 @@ def _sw_step_scipy(s, beta, h, rng, ghost):
     N = s.shape[0] - 2
     n = N * N
     MINUS, PLUS = n, n + 1
-    p = 1.0 - np.exp(-2.0 * beta)
-    pg = 1.0 - np.exp(-2.0 * beta * h)
+    p = - np.expm1(-2.0 * beta)
+    pg = - np.expm1(-2.0 * beta * h)
     core = s[1:-1, 1:-1]
     ids = np.arange(n).reshape(N, N)
-    ea, eb = [], []
+    edge_u, edge_v = [], []
     hor = (core[:, :-1] == core[:, 1:]) & (rng.random((N, N - 1)) < p)
     ver = (core[:-1, :] == core[1:, :]) & (rng.random((N - 1, N)) < p)
-    ea += [ids[:, :-1][hor], ids[:-1, :][ver]]
-    eb += [ids[:, 1:][hor], ids[1:, :][ver]]
+    edge_u += [ids[:, :-1][hor], ids[:-1, :][ver]]
+    edge_v += [ids[:, 1:][hor], ids[1:, :][ver]]
     neg = core == -1
     for flag, site in ((neg[:, 0], ids[:, 0]), (neg[:, -1], ids[:, -1]),
                        (neg[0, :], ids[0, :]), (neg[-1, :], ids[-1, :])):
         m = flag & (rng.random(N) < p)
-        ea.append(site[m])
-        eb.append(np.full(int(m.sum()), MINUS))
+        edge_u.append(site[m])
+        edge_v.append(np.full(int(m.sum()), MINUS))
     if ghost:
-        g = (core == 1) & (rng.random((N, N)) < pg)
-        ea.append(ids[g])
-        eb.append(np.full(int(g.sum()), PLUS))
-    lab = _components(n + 1 + int(ghost), np.concatenate(ea), np.concatenate(eb))
+        g = (core == 1) & (rng.random((N, N)) < p_ghost)
+        edge_u.append(ids[g])
+        edge_v.append(np.full(int(g.sum()), PLUS))
+    lab = _components(n + 1 + int(ghost), np.concatenate(edge_u), np.concatenate(edge_v))
     count = int(lab.max()) + 1
     if ghost:
         new = rng.integers(0, 2, count).astype(np.int8) * 2 - 1
@@ -73,7 +73,7 @@ def _sw_step_numba(s, beta, h, rng, ghost):
     n = N * N
     minus, plus = n, n + 1
     p = -np.expm1(-2 * beta)
-    pg = -np.expm1(-2 * beta * h) if ghost else 0.0
+    p_ghost = -np.expm1(-2 * beta * h) if ghost else 0.0
     vertices = n + 2 if ghost else n + 1
     parent = np.arange(vertices)
     sizes = np.ones(vertices, np.int64)
@@ -96,7 +96,7 @@ def _sw_step_numba(s, beta, h, rng, ghost):
                     _join(parent, sizes, a, minus)
                 if j == N - 1 and rng.random() < p:
                     _join(parent, sizes, a, minus)
-            elif ghost and rng.random() < pg:
+            elif ghost and rng.random() < p_ghost:
                 _join(parent, sizes, a, plus)
 
     colors = np.zeros(vertices, np.int8)
