@@ -15,7 +15,7 @@ def _sw_step_scipy(s, beta, h, rng, ghost):
     n = N * N
     MINUS, PLUS = n, n + 1
     p = - np.expm1(-2.0 * beta)
-    pg = - np.expm1(-2.0 * beta * h)
+    p_ghost = - np.expm1(-2.0 * beta * h)
     core = s[1:-1, 1:-1]
     ids = np.arange(n).reshape(N, N)
     edge_u, edge_v = [], []
